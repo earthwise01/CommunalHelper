@@ -398,7 +398,9 @@ public class DreamTunnelEntry : AbstractDashCollisionPanel
     {
         particles = new DreamParticle[(int) (Width / 4f * (Height / 4f) * 0.5f)];
 
-        Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _, out Color[][] activeParticleLayerColors, out Color[][] disabledParticleLayerColors);
+        Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _,
+            out Color[][] controllerActiveParticleLayerColors,
+            out Color[][] controllerDisabledParticleLayerColors);
         
         for (int i = 0; i < particles.Length; i++)
         {
@@ -406,17 +408,17 @@ public class DreamTunnelEntry : AbstractDashCollisionPanel
             particles[i].Layer = Calc.Random.Choose(0, 1, 1, 2, 2, 2);
             particles[i].TimeOffset = Calc.Random.NextFloat();
             particles[i].Color = PlayerHasDreamDash
-                ? activeParticleLayerColors is not null
-                    ? Calc.Random.Choose(activeParticleLayerColors[particles[i].Layer])
+                ? controllerActiveParticleLayerColors is not null
+                    ? Calc.Random.Choose(controllerActiveParticleLayerColors[particles[i].Layer])
                     : particles[i].Layer switch
                     {
-                        0 => Calc.Random.Choose(CustomDreamBlock.DreamColors[0], CustomDreamBlock.DreamColors[1], CustomDreamBlock.DreamColors[2]),
-                        1 => Calc.Random.Choose(CustomDreamBlock.DreamColors[3], CustomDreamBlock.DreamColors[4], CustomDreamBlock.DreamColors[5]),
-                        2 => Calc.Random.Choose(CustomDreamBlock.DreamColors[6], CustomDreamBlock.DreamColors[7], CustomDreamBlock.DreamColors[8]),
+                        0 => Calc.Random.Choose(CustomDreamBlock.VanillaParticleColors[0], CustomDreamBlock.VanillaParticleColors[1], CustomDreamBlock.VanillaParticleColors[2]),
+                        1 => Calc.Random.Choose(CustomDreamBlock.VanillaParticleColors[3], CustomDreamBlock.VanillaParticleColors[4], CustomDreamBlock.VanillaParticleColors[5]),
+                        2 => Calc.Random.Choose(CustomDreamBlock.VanillaParticleColors[6], CustomDreamBlock.VanillaParticleColors[7], CustomDreamBlock.VanillaParticleColors[8]),
                         _ => throw new NotImplementedException()
                     }
-                : disabledParticleLayerColors is not null
-                    ? Calc.Random.Choose(disabledParticleLayerColors[particles[i].Layer])
+                : controllerDisabledParticleLayerColors is not null
+                    ? Calc.Random.Choose(controllerDisabledParticleLayerColors[particles[i].Layer])
                     : Color.LightGray * (0.5f + particles[i].Layer / 2f * 0.5f);
         }
     }

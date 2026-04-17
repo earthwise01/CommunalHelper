@@ -1,16 +1,18 @@
 using Celeste.Mod.CommunalHelper.Entities;
 using MonoMod.RuntimeDetour;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
 namespace Celeste.Mod.CommunalHelper.Components;
 
 public class DreamSprite : Sprite {
-    internal class DreamSpriteMarker(Entity parent) : Entity(parent.Position)
+    internal class DreamSpriteMarker(DreamSprite parent) : Entity(parent.Entity.Position)
     {
+        public override void Awake(Scene scene)
+            => parent.SetupParticles();
+
         public override void Update()
-            => Position = parent.Position;
+            => Position = parent.Entity.Position;
     }
     internal DreamSpriteMarker Marker;
 
@@ -28,7 +30,7 @@ public class DreamSprite : Sprite {
     public static readonly Color DisabledLineColor = Color.White;
     public static readonly Color ActiveBackColor = Color.Black;
     public static readonly Color DisabledBackColor = Color.Black;
-    private static Color[] ParticleColors => CustomDreamBlock.DreamColors;
+    private static Color[] VanillaParticleColors => CustomDreamBlock.VanillaParticleColors;
 
     public float Flash = 0f;
     private const float FlashTime = 0.4f;
@@ -57,32 +59,32 @@ public class DreamSprite : Sprite {
         base.EntityAdded(scene);
         
         TrackSelf();
-        Scene.Add(Marker = new DreamSpriteMarker(Entity));
+        Scene.Add(Marker = new DreamSpriteMarker(this));
     }
 
-    public override void EntityAwake()
+    private void SetupParticles()
     {
-        base.EntityAwake();
-        
         Particles = new DreamParticle[(int)((ParticleBounds.Width / 8f) * (ParticleBounds.Height / 8f) * 0.7f)];
 
-        Imports.PandorasBox.GetVisualSettingsFor(Marker, out _, out _, out _, out _, out Color[][] activeParticleLayerColors, out Color[][] disabledParticleLayerColors);
-        
+        Imports.PandorasBox.GetVisualSettingsFor(Marker, out _, out _, out _, out _,
+            out Color[][] controllerActiveParticleLayerColors,
+            out Color[][] controllerDisabledParticleLayerColors);
+
         for (int i = 0; i < Particles.Length; i++) {
             Particles[i].Position = new Vector2(Calc.Random.NextFloat(ParticleBounds.Width), Calc.Random.NextFloat(ParticleBounds.Height));
             Particles[i].Layer = Calc.Random.Choose(0, 1, 1, 2, 2, 2);
             Particles[i].TimeOffset = Calc.Random.NextFloat();
 
-            Particles[i].DisabledColor = disabledParticleLayerColors is not null
-                ? Calc.Random.Choose(disabledParticleLayerColors[Particles[i].Layer])
+            Particles[i].DisabledColor = controllerDisabledParticleLayerColors is not null
+                ? Calc.Random.Choose(controllerDisabledParticleLayerColors[Particles[i].Layer])
                 : Color.LightGray * (0.5f + Particles[i].Layer / 2f * 0.5f);
-            Particles[i].EnabledColor = activeParticleLayerColors is not null
-                ? Calc.Random.Choose(activeParticleLayerColors[Particles[i].Layer])
+            Particles[i].EnabledColor = controllerActiveParticleLayerColors is not null
+                ? Calc.Random.Choose(controllerActiveParticleLayerColors[Particles[i].Layer])
                 : Particles[i].Layer switch
                 {
-                    0 => Calc.Random.Choose(ParticleColors[0], ParticleColors[1], ParticleColors[2]),
-                    1 => Calc.Random.Choose(ParticleColors[3], ParticleColors[4], ParticleColors[5]),
-                    2 => Calc.Random.Choose(ParticleColors[6], ParticleColors[7], ParticleColors[8]),
+                    0 => Calc.Random.Choose(VanillaParticleColors[0], VanillaParticleColors[1], VanillaParticleColors[2]),
+                    1 => Calc.Random.Choose(VanillaParticleColors[3], VanillaParticleColors[4], VanillaParticleColors[5]),
+                    2 => Calc.Random.Choose(VanillaParticleColors[6], VanillaParticleColors[7], VanillaParticleColors[8]),
                     _ => throw new NotImplementedException()
                 };
         }
@@ -100,7 +102,7 @@ public class DreamSprite : Sprite {
     public override void Removed(Entity entity)
     {
         UntrackSelf();
-        Scene.Remove(Marker);
+        Marker.RemoveSelf();
         
         base.Removed(entity);
     }
@@ -108,7 +110,7 @@ public class DreamSprite : Sprite {
     public override void EntityRemoved(Scene scene)
     {
         UntrackSelf();
-        Scene.Remove(Marker);
+        Marker.RemoveSelf();
         
         base.EntityRemoved(scene);
     }
@@ -130,7 +132,7 @@ public class DreamSprite : Sprite {
 
     private static void Entity_set_Depth(Action<Entity, int> orig, Entity self, int value)
     {
-        if (self.Scene is null)
+        if (self.Depth == value || self.Scene?.Tracker.GetEntity<DreamSpriteRenderer>() is null)
         {
             orig(self, value);
             return;

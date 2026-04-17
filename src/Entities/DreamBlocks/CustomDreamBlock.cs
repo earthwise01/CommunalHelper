@@ -30,7 +30,7 @@ public abstract class CustomDreamBlock : DreamBlock
     protected bool PlayerHasDreamDash => playerHasDreamDash;
 
     // All dream colors in one array, independent of layer.
-    public static readonly Color[] DreamColors = [
+    public static readonly Color[] VanillaParticleColors = [
         Calc.HexToColor("FFEF11"), Calc.HexToColor("FF00D0"), Calc.HexToColor("08a310"),
         Calc.HexToColor("5fcde4"), Calc.HexToColor("7fb25e"), Calc.HexToColor("E0564C"),
         Calc.HexToColor("5b6ee1"), Calc.HexToColor("CC3B3B"), Calc.HexToColor("7daa64")
@@ -155,22 +155,24 @@ public abstract class CustomDreamBlock : DreamBlock
 
     private Color GetParticleColor(int layer, Color[] dashColors)
     {
-        Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _, out Color[][] activeParticleLayerColors, out Color[][] disabledParticleLayerColors);
+        Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _,
+            out Color[][] controllerActiveParticleLayerColors,
+            out Color[][] controllerDisabledParticleLayerColors);
         
         return PlayerHasDreamDash
             ? RefillCount != -1
                 ? dashColors[layer]
-                : activeParticleLayerColors is not null
-                    ? Calc.Random.Choose(activeParticleLayerColors[layer])
+                : controllerActiveParticleLayerColors is not null
+                    ? Calc.Random.Choose(controllerActiveParticleLayerColors[layer])
                     : layer switch
                     {
-                        0 => Calc.Random.Choose(DreamColors[0], DreamColors[1], DreamColors[2]),
-                        1 => Calc.Random.Choose(DreamColors[3], DreamColors[4], DreamColors[5]),
-                        2 => Calc.Random.Choose(DreamColors[6], DreamColors[7], DreamColors[8]),
+                        0 => Calc.Random.Choose(VanillaParticleColors[0], VanillaParticleColors[1], VanillaParticleColors[2]),
+                        1 => Calc.Random.Choose(VanillaParticleColors[3], VanillaParticleColors[4], VanillaParticleColors[5]),
+                        2 => Calc.Random.Choose(VanillaParticleColors[6], VanillaParticleColors[7], VanillaParticleColors[8]),
                         _ => throw new NotImplementedException()
                     }
-            : disabledParticleLayerColors is not null
-                ? Calc.Random.Choose(disabledParticleLayerColors[layer])
+            : controllerDisabledParticleLayerColors is not null
+                ? Calc.Random.Choose(controllerDisabledParticleLayerColors[layer])
                 : Color.LightGray * (0.5f + layer / 2f * 0.5f);
     }
 
@@ -280,7 +282,7 @@ public abstract class CustomDreamBlock : DreamBlock
 
         Draw.Rect(shake.X + X, shake.Y + Y, Width, Height, backColor);
         
-        #region Particles
+        #region Particle Rendering
 
         Vector2 cameraPosition = camera.Position;
         foreach (DreamParticle particle in Particles)
@@ -331,13 +333,13 @@ public abstract class CustomDreamBlock : DreamBlock
             Draw.Rect(X + shake.X, Y + shake.Y, Width, Height * whiteHeight, Color.White * whiteFill);
 
         if (TopWobble)
-            WobbleLine(shake + new Vector2(X, Y), shake + new Vector2(X + Width, Y), 0f);
+            WobbleLine(shake + new Vector2(X, Y), shake + new Vector2(X + Width, Y), 0f, lineColor, backColor);
         if (RightWobble)
-            WobbleLine(shake + new Vector2(X + Width, Y), shake + new Vector2(X + Width, Y + Height), 0.7f);
+            WobbleLine(shake + new Vector2(X + Width, Y), shake + new Vector2(X + Width, Y + Height), 0.7f, lineColor, backColor);
         if (BottomWobble)
-            WobbleLine(shake + new Vector2(X + Width, Y + Height), shake + new Vector2(X, Y + Height), 1.5f);
+            WobbleLine(shake + new Vector2(X + Width, Y + Height), shake + new Vector2(X, Y + Height), 1.5f, lineColor, backColor);
         if (LeftWobble)
-            WobbleLine(shake + new Vector2(X, Y + Height), shake + new Vector2(X, Y), 2.5f);
+            WobbleLine(shake + new Vector2(X, Y + Height), shake + new Vector2(X, Y), 2.5f, lineColor, backColor);
 
         Draw.Rect(shake + new Vector2(X, Y), 2f, 2f, lineColor);
         Draw.Rect(shake + new Vector2(X + Width - 2f, Y), 2f, 2f, lineColor);
@@ -350,6 +352,34 @@ public abstract class CustomDreamBlock : DreamBlock
         const float offset = 2f;
         return position.X >= X + offset && position.Y >= Y + offset && position.X < Right - offset && position.Y < Bottom - offset;
     }
+
+    protected void WobbleLine(Vector2 from, Vector2 to, float offset, Color lineColor, Color backColor)
+    {
+        Vector2 vec = to - from;
+        float length = vec.Length();
+        Vector2 value = Vector2.Normalize(vec);
+        Vector2 perp = new(value.Y, -value.X);
+
+        float scaleFactor = 0f;
+        int increment = 16;
+        for (int i = 2; i < length - 2; i += increment)
+        {
+            float scale = MathHelper.Lerp(LineAmplitude(wobbleFrom + offset, i), LineAmplitude(wobbleTo + offset, i), wobbleEase);
+            if (i + increment >= length)
+                scale = 0f;
+
+            float endFactor = Math.Min(increment, length - 2f - i);
+            Vector2 segmentStart = from + value * i + perp * scaleFactor;
+            Vector2 segmentEnd = from + value * (i + endFactor) + perp * scale;
+            Draw.Line(segmentStart - perp, segmentEnd - perp, backColor);
+            Draw.Line(segmentStart - perp * 2f, segmentEnd - perp * 2f, backColor);
+            Draw.Line(segmentStart, segmentEnd, lineColor);
+
+            scaleFactor = scale;
+        }
+    }
+
+    #region Shattering
 
     protected bool ShatterCheck()
         => !Shattering;
@@ -425,6 +455,8 @@ public abstract class CustomDreamBlock : DreamBlock
         Collidable = Visible = false;
         DisableStaticMovers();
     }
+
+    #endregion
 
     #region Hooks
 

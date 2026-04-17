@@ -11,7 +11,7 @@ namespace Celeste.Mod.CommunalHelper.Entities;
 [Tracked(true)]
 internal class DreamTheoCrystal : TheoCrystal
 {
-    public static readonly ParticleType[] P_DreamImpact = new ParticleType[CustomDreamBlock.DreamColors.Length];
+    public static readonly ParticleType[] P_DreamImpact = new ParticleType[CustomDreamBlock.VanillaParticleColors.Length];
 
     private static readonly Rectangle particleBounds = new(-12, -24, 24, 48);
     private readonly DreamSprite dreamSprite;
@@ -73,12 +73,12 @@ internal class DreamTheoCrystal : TheoCrystal
 
     internal static void InitializeParticles()
     {
-        for (int i = 0; i < CustomDreamBlock.DreamColors.Length; i++)
+        for (int i = 0; i < CustomDreamBlock.VanillaParticleColors.Length; i++)
         {
             P_DreamImpact[i] = new ParticleType(P_Impact)
             {
-                Color = CustomDreamBlock.DreamColors[i],
-                Color2 = Color.Lerp(CustomDreamBlock.DreamColors[(i + 2) % CustomDreamBlock.DreamColors.Length], P_Impact.Color2, 0.4f),
+                Color = CustomDreamBlock.VanillaParticleColors[i],
+                Color2 = Color.Lerp(CustomDreamBlock.VanillaParticleColors[(i + 2) % CustomDreamBlock.VanillaParticleColors.Length], P_Impact.Color2, 0.4f),
             };
         }
     }

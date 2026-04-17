@@ -12,11 +12,13 @@ public static class PandorasBox
     [ModImportName("PandorasBox.DreamDashController")]
     public static class DreamDashController
     {
-        public static Action<List<Type>> AddSetupIgnoringTypes;
-        public static Action<List<Type>> RemoveSetupIgnoringTypes;
+        public delegate void AddRemoveTypesDelegate(HashSet<Type> types);
+
+        public static AddRemoveTypesDelegate AddSetupIgnoringTypes;
+        public static AddRemoveTypesDelegate RemoveSetupIgnoringTypes;
     
-        public static Action<List<Type>> AddControlledTypes;
-        public static Action<List<Type>> RemoveControlledTypes;
+        public static AddRemoveTypesDelegate AddControlledTypes;
+        public static AddRemoveTypesDelegate RemoveControlledTypes;
 
         public delegate void GetGameplaySettingsForDelegate(Entity entity,
             out bool? allowSameDirectionDash,
@@ -35,21 +37,19 @@ public static class PandorasBox
             out Color? disabledBackColor,
             out Color? activeLineColor,
             out Color? disabledLineColor,
-            out Color[] activeParticleLayerColors,
-            out int[] activeParticleLayerIndices,
-            out Color[] disabledParticleLayerColors,
-            out int[] disabledParticleLayerIndices);
+            out Color[][] activeParticleLayerColors,
+            out Color[][] disabledParticleLayerColors);
         public static GetVisualSettingsForDelegate GetVisualSettingsFor;
     }
     
-    public static void AddSetupIgnoringTypes(List<Type> types)
+    public static void AddSetupIgnoringTypes(HashSet<Type> types)
         => DreamDashController.AddSetupIgnoringTypes?.Invoke(types);
-    public static void RemoveSetupIgnoringTypes(List<Type> types)
+    public static void RemoveSetupIgnoringTypes(HashSet<Type> types)
         => DreamDashController.RemoveSetupIgnoringTypes?.Invoke(types);
     
-    public static void AddControlledTypes(List<Type> types)
+    public static void AddControlledTypes(HashSet<Type> types)
         => DreamDashController.AddControlledTypes?.Invoke(types);
-    public static void RemoveControlledTypes(List<Type> types)
+    public static void RemoveControlledTypes(HashSet<Type> types)
         => DreamDashController.RemoveControlledTypes?.Invoke(types);
 
     public static void GetGameplaySettingsFor(Entity entity,
@@ -99,27 +99,19 @@ public static class PandorasBox
         disabledLineColor = null;
         activeParticleLayerColors = null;
         disabledParticleLayerColors = null;
-               
-        if (DreamDashController.GetVisualSettingsFor is null)
-            return;
-        
-        DreamDashController.GetVisualSettingsFor(entity,
+
+        DreamDashController.GetVisualSettingsFor?.Invoke(entity,
             out activeBackColor,
             out disabledBackColor,
             out activeLineColor,
             out disabledLineColor,
-            out Color[] packedActiveParticleLayerColors,
-            out int[] activeParticleLayerIndices,
-            out Color[] packedDisabledParticleLayerColors,
-            out int[] disabledParticleLayerIndices);
-
-        activeParticleLayerColors = Util.UnpackArray(packedActiveParticleLayerColors, activeParticleLayerIndices);
-        disabledParticleLayerColors = Util.UnpackArray(packedDisabledParticleLayerColors, disabledParticleLayerIndices);
+            out activeParticleLayerColors,
+            out disabledParticleLayerColors);
     }
     
     #endregion
     
-    private static readonly List<Type> SetupIgnoringTypes =
+    private static readonly HashSet<Type> SetupIgnoringTypes =
     [
         typeof(CustomDreamBlock),
         typeof(ConnectedDreamBlock),
@@ -132,7 +124,7 @@ public static class PandorasBox
         typeof(DreamZipMover),
         typeof(ChainedDreamFallingBlock)
     ];
-    private static readonly List<Type> ControlledTypes =
+    private static readonly HashSet<Type> ControlledTypes =
     [
         typeof(DreamSprite.DreamSpriteMarker),
         typeof(DreamTunnelEntry)

@@ -9,9 +9,9 @@ namespace Celeste.Mod.CommunalHelper.Entities;
 [Tracked(true)]
 internal class DreamJellyfish : Glider
 {
-    public static readonly ParticleType[] P_DreamGlow = new ParticleType[CustomDreamBlock.DreamColors.Length];
-    public static readonly ParticleType[] P_DreamGlideUp = new ParticleType[CustomDreamBlock.DreamColors.Length];
-    public static readonly ParticleType[] P_DreamGlide = new ParticleType[CustomDreamBlock.DreamColors.Length];
+    public static readonly ParticleType[] P_DreamGlow = new ParticleType[CustomDreamBlock.VanillaParticleColors.Length];
+    public static readonly ParticleType[] P_DreamGlideUp = new ParticleType[CustomDreamBlock.VanillaParticleColors.Length];
+    public static readonly ParticleType[] P_DreamGlide = new ParticleType[CustomDreamBlock.VanillaParticleColors.Length];
 
     private static readonly Rectangle particleBounds = new(-23, -35, 48, 60);
     private readonly DreamSprite dreamSprite;
@@ -71,11 +71,11 @@ internal class DreamJellyfish : Glider
     internal static void InitializeParticles()
     {
         Color flash = P_Glow.Color2;
-        for (int i = 0; i < CustomDreamBlock.DreamColors.Length; i++)
+        for (int i = 0; i < CustomDreamBlock.VanillaParticleColors.Length; i++)
         {
-            Color color = CustomDreamBlock.DreamColors[i];
+            Color color = CustomDreamBlock.VanillaParticleColors[i];
             Color highlight = i % 2 == 0 ? P_Glide.Color : P_Glide.Color2;
-            Color next = Color.Lerp(CustomDreamBlock.DreamColors[(i + 2) % CustomDreamBlock.DreamColors.Length], flash, 0.4f);
+            Color next = Color.Lerp(CustomDreamBlock.VanillaParticleColors[(i + 2) % CustomDreamBlock.VanillaParticleColors.Length], flash, 0.4f);
 
             P_DreamGlow[i] = new ParticleType(P_Glow)
             {

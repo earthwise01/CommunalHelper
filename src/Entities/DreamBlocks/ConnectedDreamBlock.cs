@@ -529,32 +529,6 @@ public class ConnectedDreamBlock : CustomDreamBlock
         }
     }
 
-    private void WobbleLine(Vector2 from, Vector2 to, float offset, Color line, Color back)
-    {
-        Vector2 vec = to - from;
-        float length = vec.Length();
-        Vector2 value = Vector2.Normalize(vec);
-        Vector2 perp = new(value.Y, -value.X);
-
-        float scaleFactor = 0f;
-        int increment = 16;
-        for (int i = 2; i < length - 2; i += increment)
-        {
-            float scale = MathHelper.Lerp(LineAmplitude(wobbleFrom + offset, i), LineAmplitude(wobbleTo + offset, i), wobbleEase);
-            if (i + increment >= length)
-                scale = 0f;
-
-            float endFactor = Math.Min(increment, length - 2f - i);
-            Vector2 segmentStart = from + value * i + perp * scaleFactor;
-            Vector2 segmentEnd = from + value * (i + endFactor) + perp * scale;
-            Draw.Line(segmentStart - perp, segmentEnd - perp, back);
-            Draw.Line(segmentStart - perp * 2f, segmentEnd - perp * 2f, back);
-            Draw.Line(segmentStart, segmentEnd, line);
-
-            scaleFactor = scale;
-        }
-    }
-
     public override void MoveHExact(int move)
     {
         base.MoveHExact(move);
