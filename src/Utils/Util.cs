@@ -319,7 +319,17 @@ public static class Util
             middle.Render();
         }
     }
-    
+
+    public static bool SharesAnyValueWith<T>(this IEnumerable<T> a, IEnumerable<T> b)
+    {
+        return a.Intersect(b).Any();
+    }
+
+    public static bool ContainsAllFrom<T>(this IEnumerable<T> a, IEnumerable<T> b)
+    {
+        return !b.Except(a).Any();
+    }
+
     public static (T[], int[]) PackArray<T>(T[][] toPack)
     {
         int[] startingIndices = new int[toPack.Length];

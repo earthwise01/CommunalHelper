@@ -140,6 +140,8 @@ public static class PandorasBox
     
     internal static void Initialize()
     {
+        typeof(DreamDashController).ModInterop();
+
         AddSetupIgnoringTypes(SetupIgnoringTypes);
         AddControlledTypes(ControlledTypes);
     }
