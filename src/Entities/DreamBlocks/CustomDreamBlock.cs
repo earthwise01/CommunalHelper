@@ -9,7 +9,7 @@ namespace Celeste.Mod.CommunalHelper.Entities;
 [TrackedAs(typeof(DreamBlock), true)]
 public abstract class CustomDreamBlock : DreamBlock
 {
-    protected new struct DreamParticle
+    protected struct CustomDreamParticle
     {
         public Vector2 Position;
         public int Layer;
@@ -22,8 +22,8 @@ public abstract class CustomDreamBlock : DreamBlock
         public float MaxRotate;
         public float RotationCounter;
     }
-    
-    protected DreamParticle[] Particles;
+
+    protected CustomDreamParticle[] Particles;
     protected readonly MTexture[] FeatherTextures;
     protected readonly MTexture[] DoubleRefillStarTextures;
 
@@ -39,7 +39,7 @@ public abstract class CustomDreamBlock : DreamBlock
     protected readonly bool FeatherMode;
     private readonly float dashSpeed;
     protected readonly int RefillCount;
-    
+
     protected bool Shattering = false;
     protected float ColorLerp = 0.0f;
     protected readonly bool QuickDestroy;
@@ -49,7 +49,7 @@ public abstract class CustomDreamBlock : DreamBlock
     protected bool TopWobble = true;
     protected bool BottomWobble = true;
 
-    private bool shakeToggle = false;
+    private bool nextShakeHorizontal = false;
     private readonly ParticleType shakeParticle;
     private readonly float[] particleRemainders = new float[4];
 
@@ -99,26 +99,26 @@ public abstract class CustomDreamBlock : DreamBlock
     public override void Removed(Scene scene)
     {
         base.Removed(scene);
-        
+
         Glitch.Value = 0f;
     }
 
     public override void Awake(Scene scene)
     {
         base.Awake(scene);
-        
+
         IsAwake = true;
         SetupCustomParticles(Width, Height);
     }
 
     protected virtual void SetupCustomParticles(float canvasWidth, float canvasHeight)
     {
-        float countFactor = (FeatherMode ? 0.5f : 0.7f) * (RefillCount != -1 ? 1.2f : 1);
-        Particles = new DreamParticle[(int) (canvasWidth / 8f * (canvasHeight / 8f) * 0.7f * countFactor)];
-
-        // Necessary to get the player's spritemode
-        if (!IsAwake && RefillCount != -1)
+        // necessary to be able to get the player's hair color and dream dash controller particle colors
+        if (!IsAwake)
             return;
+
+        float countFactor = (FeatherMode ? 0.5f : 0.7f) * (RefillCount != -1 ? 1.2f : 1f);
+        Particles = new CustomDreamParticle[(int)(canvasWidth / 8f * (canvasHeight / 8f) * 0.7f * countFactor)];
 
         Color[] dashColors = new Color[3];
         if (RefillCount != -1)
@@ -128,38 +128,33 @@ public abstract class CustomDreamBlock : DreamBlock
             dashColors[2] = Color.Lerp(dashColors[1], Color.White, 0.5f);
         }
 
+        Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _,
+            out Color[][] controllerActiveParticleLayerColors,
+            out Color[][] controllerDisabledParticleLayerColors);
+
         for (int i = 0; i < Particles.Length; i++)
         {
             int layer = Calc.Random.Choose(0, 1, 1, 2, 2, 2);
-            Particles[i] = new DreamParticle
+            Particles[i] = new CustomDreamParticle
             {
                 Position = new Vector2(Calc.Random.NextFloat(canvasWidth), Calc.Random.NextFloat(canvasHeight)),
                 Layer = layer,
-                Color = GetParticleColor(layer, dashColors),
+                Color = GetParticleColor(layer, dashColors, controllerActiveParticleLayerColors, controllerDisabledParticleLayerColors),
                 TimeOffset = Calc.Random.NextFloat()
             };
 
-            #region Feather particle stuff
-
             if (!FeatherMode)
                 continue;
-            
+
             Particles[i].Speed = Calc.Random.Range(6f, 16f);
             Particles[i].Spin = Calc.Random.Range(8f, 12f) * 0.2f;
             Particles[i].RotationCounter = Calc.Random.NextAngle();
             Particles[i].MaxRotate = Calc.Random.Range(0.3f, 0.6f) * ((float) Math.PI / 2f);
-
-            #endregion
         }
     }
 
-    private Color GetParticleColor(int layer, Color[] dashColors)
-    {
-        Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _,
-            out Color[][] controllerActiveParticleLayerColors,
-            out Color[][] controllerDisabledParticleLayerColors);
-        
-        return PlayerHasDreamDash
+    private Color GetParticleColor(int layer, Color[] dashColors, Color[][] controllerActiveParticleLayerColors, Color[][] controllerDisabledParticleLayerColors)
+        => PlayerHasDreamDash
             ? RefillCount != -1
                 ? dashColors[layer]
                 : controllerActiveParticleLayerColors is not null
@@ -174,58 +169,6 @@ public abstract class CustomDreamBlock : DreamBlock
             : controllerDisabledParticleLayerColors is not null
                 ? Calc.Random.Choose(controllerDisabledParticleLayerColors[layer])
                 : Color.LightGray * (0.5f + layer / 2f * 0.5f);
-    }
-
-    private void ShakeParticles()
-    {
-        for (int i = 0; i < 4; ++i)
-        {
-            Vector2 position;
-            Vector2 positionRange;
-            float angle;
-            float numParticles;
-            
-            switch (i)
-            {
-                case 0:
-                    position = CenterLeft + Vector2.UnitX;
-                    positionRange = Vector2.UnitY * (Height - 4f);
-                    angle = MathF.PI;
-                    numParticles = Height / 32f;
-                    break;
-                
-                case 1:
-                    position = CenterRight;
-                    positionRange = Vector2.UnitY * (Height - 4f);
-                    angle = 0f;
-                    numParticles = Height / 32f;
-                    break;
-                
-                case 2:
-                    position = TopCenter + Vector2.UnitY;
-                    positionRange = Vector2.UnitX * (Width - 4f);
-                    angle = -MathF.PI / 2f;
-                    numParticles = Width / 32f;
-                    break;
-                
-                default:
-                    position = BottomCenter;
-                    positionRange = Vector2.UnitX * (Width - 4f);
-                    angle = MathF.PI / 2f;
-                    numParticles = Width / 32f;
-                    break;
-            }
-
-            numParticles *= 0.25f;
-            particleRemainders[i] += numParticles;
-            int amount = (int) particleRemainders[i];
-            particleRemainders[i] -= amount;
-            
-            positionRange *= 0.5f;
-            if (amount > 0f)
-                SceneAs<Level>().ParticlesBG.Emit(shakeParticle, amount, position, positionRange, angle);
-        }
-    }
 
     public override void Update()
     {
@@ -234,16 +177,16 @@ public abstract class CustomDreamBlock : DreamBlock
         if (FeatherMode && PlayerHasDreamDash)
             UpdateParticles();
 
-        if (Visible && PlayerHasDreamDash && oneUse && Scene.OnInterval(0.03f))
+        if (oneUse && Visible && PlayerHasDreamDash && Scene.OnInterval(0.03f))
         {
-            if (shakeToggle)
+            if (nextShakeHorizontal)
                 shake.X = Calc.Random.Next(-1, 2);
             else
                 shake.Y = Calc.Random.Next(-1, 2);
-            
-            shakeToggle = !shakeToggle;
+
+            nextShakeHorizontal = !nextShakeHorizontal;
             if (!Shattering)
-                ShakeParticles();
+                SpawnOneUseIdleParticles();
         }
     }
 
@@ -260,6 +203,57 @@ public abstract class CustomDreamBlock : DreamBlock
 
     private static float GetLayerScaleFactor(int layer)
         => 1f / (0.3f + 0.25f * layer);
+
+    private void SpawnOneUseIdleParticles()
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            Vector2 position;
+            Vector2 positionRange;
+            float angle;
+            float numParticles;
+
+            switch (i)
+            {
+                case 0:
+                    position = CenterLeft + Vector2.UnitX;
+                    positionRange = Vector2.UnitY * (Height - 4f);
+                    angle = MathF.PI;
+                    numParticles = Height / 32f;
+                    break;
+
+                case 1:
+                    position = CenterRight;
+                    positionRange = Vector2.UnitY * (Height - 4f);
+                    angle = 0f;
+                    numParticles = Height / 32f;
+                    break;
+
+                case 2:
+                    position = TopCenter + Vector2.UnitY;
+                    positionRange = Vector2.UnitX * (Width - 4f);
+                    angle = -MathF.PI / 2f;
+                    numParticles = Width / 32f;
+                    break;
+
+                default:
+                    position = BottomCenter;
+                    positionRange = Vector2.UnitX * (Width - 4f);
+                    angle = MathF.PI / 2f;
+                    numParticles = Width / 32f;
+                    break;
+            }
+
+            numParticles *= 0.25f;
+            particleRemainders[i] += numParticles;
+            int amount = (int) particleRemainders[i];
+            particleRemainders[i] -= amount;
+
+            positionRange *= 0.5f;
+            if (amount > 0f)
+                SceneAs<Level>().ParticlesBG.Emit(shakeParticle, amount, position, positionRange, angle);
+        }
+    }
 
     public override void Render()
     {
@@ -284,16 +278,18 @@ public abstract class CustomDreamBlock : DreamBlock
         
         #region Particle Rendering
 
-        Vector2 cameraPosition = camera.Position;
-        foreach (DreamParticle particle in Particles)
+        foreach (CustomDreamParticle particle in Particles)
         {
             int layer = particle.Layer;
-            Vector2 position = particle.Position + cameraPosition * (0.3f + 0.25f * layer);
-            
-            float rotation = MathF.PI / 2f - 0.8f + MathF.Sin(particle.RotationCounter * particle.MaxRotate);
+            Vector2 position = particle.Position + camera.Position * (0.3f + 0.25f * layer);
+
+            float rotation = 0f;
             if (FeatherMode)
+            {
+                rotation = MathF.PI / 2f - 0.8f + MathF.Sin(particle.RotationCounter * particle.MaxRotate);
                 position += Calc.AngleToVector(rotation, 4f);
-            
+            }
+
             position = PutInside(position);
             if (!CheckParticleCollide(position))
                 continue;
@@ -301,7 +297,7 @@ public abstract class CustomDreamBlock : DreamBlock
             Color color = Color.Lerp(particle.Color, Color.Black, ColorLerp);
 
             if (FeatherMode)
-                FeatherTextures[layer].DrawCentered(position, color, 1, rotation);
+                FeatherTextures[layer].DrawCentered(position, color, 1f, rotation);
             else
             {
                 MTexture[] textures = RefillCount != -1 ? DoubleRefillStarTextures : particleTextures;
@@ -312,17 +308,17 @@ public abstract class CustomDreamBlock : DreamBlock
                         int i = (int) ((particle.TimeOffset * 4f + animTimer) % 4f);
                         particleTexture = textures[3 - i];
                         break;
-                    
+
                     case 1:
                         int j = (int) ((particle.TimeOffset * 2f + animTimer) % 2f);
                         particleTexture = textures[1 + j];
                         break;
-                    
+
                     default:
                         particleTexture = textures[2];
                         break;
                 }
-                
+
                 particleTexture.DrawCentered(position, color);
             }
         }
@@ -330,7 +326,12 @@ public abstract class CustomDreamBlock : DreamBlock
         #endregion
 
         if (whiteFill > 0f)
-            Draw.Rect(X + shake.X, Y + shake.Y, Width, Height * whiteHeight, Color.White * whiteFill);
+        {
+            lineColor = Color.Lerp(lineColor, Color.White, whiteFill);
+            backColor = Color.Lerp(backColor, Color.White, whiteFill);
+
+            Draw.Rect(shake.X + X, shake.Y + Y, Width, Height * whiteHeight, Color.White * whiteFill);
+        }
 
         if (TopWobble)
             WobbleLine(shake + new Vector2(X, Y), shake + new Vector2(X + Width, Y), 0f, lineColor, backColor);
@@ -462,6 +463,7 @@ public abstract class CustomDreamBlock : DreamBlock
 
     internal static void Load()
     {
+        On.Celeste.DreamBlock.Setup += DreamBlock_Setup;
         On.Celeste.DreamBlock.OnPlayerExit += DreamBlock_OnPlayerExit;
         On.Celeste.DreamBlock.OneUseDestroy += DreamBlock_OneUseDestroy;
 
@@ -476,6 +478,7 @@ public abstract class CustomDreamBlock : DreamBlock
 
     internal static void Unload()
     {
+        On.Celeste.DreamBlock.Setup -= DreamBlock_Setup;
         On.Celeste.DreamBlock.OnPlayerExit -= DreamBlock_OnPlayerExit;
         On.Celeste.DreamBlock.OneUseDestroy -= DreamBlock_OneUseDestroy;
 
@@ -486,6 +489,14 @@ public abstract class CustomDreamBlock : DreamBlock
         ConnectedDreamBlock.Unload();
         DreamMoveBlock.Unload();
         DreamCrumbleWallOnRumble.Unload();
+    }
+
+    private static void DreamBlock_Setup(On.Celeste.DreamBlock.orig_Setup orig, DreamBlock self)
+    {
+        if (self is CustomDreamBlock customDreamBlock)
+            customDreamBlock.SetupCustomParticles(customDreamBlock.Width, customDreamBlock.Height);
+        else
+            orig(self);
     }
 
     private static void DreamBlock_OnPlayerExit(On.Celeste.DreamBlock.orig_OnPlayerExit orig, DreamBlock dreamBlock, Player player)

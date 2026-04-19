@@ -370,7 +370,7 @@ public class ConnectedDreamBlock : CustomDreamBlock
                 backColor = Color.Lerp(backColor, Color.White, whiteFill);
         }
 
-        #region Background rendering
+        #region Background Rendering
 
         foreach (ConnectedDreamBlock block in Group.Where(block => !(block.Right < camera.Left)
             && !(block.Left > camera.Right)
@@ -380,14 +380,14 @@ public class ConnectedDreamBlock : CustomDreamBlock
 
         #endregion
 
-        #region Particle rendering
+        #region Particle Rendering
 
-        foreach (DreamParticle particle in Particles)
+        foreach (CustomDreamParticle particle in Particles)
         {
             int layer = particle.Layer;
             Vector2 position = particle.Position + camera.Position * (0.3f + 0.25f * layer);
 
-            float rotation = 0;
+            float rotation = 0f;
             MTexture particleTexture;
             if (FeatherMode)
             {
@@ -418,7 +418,7 @@ public class ConnectedDreamBlock : CustomDreamBlock
             particleTexture ??= Draw.Particle;
 
             position = PutInside(position, GroupRect);
-            if (!CullHelper.IsRectangleVisible(position.X, position.Y, particleTexture.Width, particleTexture.Height, 8, camera))
+            if (!CullHelper.IsRectangleVisible(position.X, position.Y, particleTexture.Width, particleTexture.Height, 8f, camera))
                 continue;
 
             bool particleIsInside = Group.Any(block => block.CheckParticleCollide(position));
@@ -429,7 +429,7 @@ public class ConnectedDreamBlock : CustomDreamBlock
             if (whiteFill > 0f && whiteHeight == 1f)
                 color = Color.Lerp(color, Color.White, whiteFill);
 
-            particleTexture.DrawCentered(position + Shake + shake, color, 1, rotation);
+            particleTexture.DrawCentered(position + Shake + shake, color, 1f, rotation);
         }
 
         #endregion
@@ -560,19 +560,19 @@ public class ConnectedDreamBlock : CustomDreamBlock
             switch (edge.Facing)
             {
                 case Edges.North:
-                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) width, new Vector2(centerH, edge.Start.Y), Vector2.UnitX * width / 2f, Color.White, MathF.PI);
+                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) width, groupBoundsMin + new Vector2(centerH, edge.Start.Y), Vector2.UnitX * width / 2f, Color.White, MathF.PI);
                     break;
 
                 case Edges.South:
-                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) width, new Vector2(centerH, edge.End.Y), Vector2.UnitX * width / 2f, Color.White, 0f);
+                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) width, groupBoundsMin + new Vector2(centerH, edge.End.Y), Vector2.UnitX * width / 2f, Color.White, 0f);
                     break;
 
                 case Edges.West:
-                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) height, new Vector2(edge.Start.X, centerV), Vector2.UnitY * height / 2f, Color.White, MathF.PI * 3f / 2f);
+                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) height, groupBoundsMin + new Vector2(edge.Start.X, centerV), Vector2.UnitY * height / 2f, Color.White, MathF.PI * 3f / 2f);
                     break;
 
                 case Edges.East:
-                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) height, new Vector2(edge.End.X, centerV), Vector2.UnitY * height / 2f, Color.White, MathF.PI / 2f);
+                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) height, groupBoundsMin + new Vector2(edge.End.X, centerV), Vector2.UnitY * height / 2f, Color.White, MathF.PI / 2f);
                     break;
 
                 default:
@@ -735,97 +735,104 @@ public class ConnectedDreamBlock : CustomDreamBlock
 
     #region Hooks
 
-    private static ILHook hook_DreamBlock_FastActivate, hook_DreamBlock_FastDeactivate;
     private static ILHook hook_DreamBlock_Activate, hook_DreamBlock_Deactivate;
-
-    private static FieldInfo f_DreamBlock_Routine_this;
+    private static ILHook hook_DreamBlock_FastActivate, hook_DreamBlock_FastDeactivate;
 
     public static void Load()
     {
         On.Celeste.DreamBlock.FootstepRipple += DreamBlock_FootstepRipple;
 
-        Type[] nestedTypes = typeof(DreamBlock).GetNestedTypes(BindingFlags.NonPublic);
-        Type nestedType = nestedTypes.First(t => t.Name.StartsWith("<FastActivate>"));
-        f_DreamBlock_Routine_this = nestedType.GetField("<>4__this", BindingFlags.Public | BindingFlags.Instance);
-        hook_DreamBlock_FastActivate = new ILHook(nestedType.GetMethod("MoveNext", BindingFlags.NonPublic | BindingFlags.Instance), DreamBlockFastRoutine);
-
-        nestedType = nestedTypes.First(t => t.Name.StartsWith("<FastDeactivate>"));
-        f_DreamBlock_Routine_this = nestedType.GetField("<>4__this", BindingFlags.Public | BindingFlags.Instance);
-        hook_DreamBlock_FastDeactivate = new ILHook(nestedType.GetMethod("MoveNext", BindingFlags.NonPublic | BindingFlags.Instance), DreamBlockFastRoutine);
-
-        nestedType = nestedTypes.First(t => t.Name.StartsWith("<Activate>"));
-        f_DreamBlock_Routine_this = nestedType.GetField("<>4__this", BindingFlags.Public | BindingFlags.Instance);
-        hook_DreamBlock_Activate = new ILHook(nestedType.GetMethod("MoveNext", BindingFlags.NonPublic | BindingFlags.Instance), DreamBlockSlowRoutine);
-
-        nestedType = nestedTypes.First(t => t.Name.StartsWith("<Deactivate>"));
-        f_DreamBlock_Routine_this = nestedType.GetField("<>4__this", BindingFlags.Public | BindingFlags.Instance);
-        hook_DreamBlock_Deactivate = new ILHook(nestedType.GetMethod("MoveNext", BindingFlags.NonPublic | BindingFlags.Instance), DreamBlockSlowRoutine);
+        hook_DreamBlock_Activate = new ILHook(typeof(DreamBlock).GetMethod(nameof(DreamBlock.Activate))!.GetStateMachineTarget()!, DreamBlockSlowRoutine);
+        hook_DreamBlock_Deactivate = new ILHook(typeof(DreamBlock).GetMethod(nameof(DreamBlock.Deactivate))!.GetStateMachineTarget()!, DreamBlockSlowRoutine);
+        hook_DreamBlock_FastActivate = new ILHook(typeof(DreamBlock).GetMethod(nameof(DreamBlock.FastActivate))!.GetStateMachineTarget()!, DreamBlockFastRoutine);
+        hook_DreamBlock_FastDeactivate = new ILHook(typeof(DreamBlock).GetMethod(nameof(DreamBlock.FastDeactivate))!.GetStateMachineTarget()!, DreamBlockFastRoutine);
     }
 
     public static void Unload()
     {
         On.Celeste.DreamBlock.FootstepRipple -= DreamBlock_FootstepRipple;
 
-        hook_DreamBlock_FastActivate.Dispose();
-        hook_DreamBlock_FastDeactivate.Dispose();
-        hook_DreamBlock_Activate.Dispose();
-        hook_DreamBlock_Deactivate.Dispose();
+        hook_DreamBlock_Activate?.Dispose();
+        hook_DreamBlock_Activate = null;
+        hook_DreamBlock_Deactivate?.Dispose();
+        hook_DreamBlock_Deactivate = null;
+        hook_DreamBlock_FastActivate?.Dispose();
+        hook_DreamBlock_FastActivate = null;
+        hook_DreamBlock_FastDeactivate?.Dispose();
+        hook_DreamBlock_FastDeactivate = null;
+
+    }
+
+    private static void DreamBlock_FootstepRipple(On.Celeste.DreamBlock.orig_FootstepRipple orig, DreamBlock dreamBlock, Vector2 pos)
+    {
+        if (dreamBlock is ConnectedDreamBlock connectedDreamBlock)
+            connectedDreamBlock.ConnectedFootstepRipple(pos);
+        else
+            orig(dreamBlock, pos);
     }
 
     private static void DreamBlockSlowRoutine(ILContext il)
     {
         ILCursor cursor = new(il);
 
-        cursor.GotoNext(instr => instr.OpCode == OpCodes.Ldfld && ((FieldReference) instr.Operand).Name.Contains("level"));
-        cursor.GotoNext(MoveType.After, instr => instr.OpCode.ToShortOp() == OpCodes.Brfalse_S);
-        object breakTarget = cursor.Prev.Operand;
+        ILLabel afterParticlesEmittedLabel = null;
 
-        // Load DreamBlock object
-        cursor.Emit(OpCodes.Ldarg_0);
-        cursor.Emit(OpCodes.Ldfld, f_DreamBlock_Routine_this);
+        if (!cursor.TryGotoNextBestFit(MoveType.After,
+            instr => instr.MatchLdarg0(),
+            instr => instr.OpCode == OpCodes.Ldfld && ((FieldReference) instr.Operand).Name.Contains("level"),
+            instr => instr.MatchLdcR4(out _),
+            instr => instr.MatchCallOrCallvirt<Scene>(nameof(Scene.OnInterval)),
+            instr => instr.MatchBrfalse(out afterParticlesEmittedLabel)))
+            throw new Exception("Unable to find particle spawning to modify.");
 
-        cursor.EmitDelegate<Func<DreamBlock, bool>>(block =>
+        cursor.EmitLdloc1(); // dreamBlock
+        cursor.EmitDelegate(SpawnConnectedDreamBlockParticles);
+        cursor.EmitBrtrue(afterParticlesEmittedLabel);
+
+        return;
+
+        static bool SpawnConnectedDreamBlockParticles(DreamBlock dreamBlock)
         {
-            if (block is not ConnectedDreamBlock connected)
+            if (dreamBlock is not ConnectedDreamBlock connectedDreamBlock)
                 return false;
 
-            connected.SpawnSlowRoutineParticles();
+            connectedDreamBlock.SpawnSlowRoutineParticles();
             return true;
-        });
-
-        // Skip regular particles;
-        cursor.Emit(OpCodes.Brtrue, breakTarget);
+        }
     }
 
     private static void DreamBlockFastRoutine(ILContext il)
     {
         ILCursor cursor = new(il);
 
-        cursor.GotoNext(instr => instr.Next.OpCode == OpCodes.Ldfld && ((FieldReference) instr.Next.Operand).Name.Contains("level"));
+        if (!cursor.TryGotoNextBestFit(MoveType.Before,
+            instr => instr.MatchLdarg0(),
+            instr => instr.OpCode == OpCodes.Ldfld && ((FieldReference) instr.Operand).Name.Contains("level"),
+            instr => instr.MatchLdfld<Level>(nameof(Level.ParticlesFG))))
+            throw new Exception("Unable to find particle spawning to modify.");
 
-        // Load DreamBlock object
-        cursor.Emit(OpCodes.Ldarg_0);
-        cursor.Emit(OpCodes.Ldfld, f_DreamBlock_Routine_this);
+        ILLabel afterParticlesEmittedLabel = cursor.DefineLabel();
 
-        cursor.EmitDelegate<Func<DreamBlock, bool>>(block =>
+        cursor.EmitLdloc1(); // dreamBlock
+        cursor.EmitDelegate(SpawnConnectedDreamBlockParticles);
+        cursor.EmitBrtrue(afterParticlesEmittedLabel);
+
+        cursor.Index = -1;
+        if (!cursor.TryGotoPrev(MoveType.After,
+            instr => instr.MatchCallOrCallvirt<ParticleSystem>(nameof(ParticleSystem.Emit))))
+            throw new Exception("Unable to find end of particle spawning to jump after.");
+        cursor.MarkLabel(afterParticlesEmittedLabel);
+
+        return;
+
+        static bool SpawnConnectedDreamBlockParticles(DreamBlock dreamBlock)
         {
-            if (block is not ConnectedDreamBlock connected)
+            if (dreamBlock is not ConnectedDreamBlock connectedDreamBlock)
                 return false;
 
-            connected.SpawnFastRoutineParticles();
+            connectedDreamBlock.SpawnFastRoutineParticles();
             return true;
-        });
-
-        // Skip regular particles
-        cursor.Emit(OpCodes.Brtrue, il.Instrs.Last(instr => instr.Previous?.OpCode == OpCodes.Callvirt && ((MethodReference) instr.Previous?.Operand)!.Name == "Emit"));
-    }
-
-    private static void DreamBlock_FootstepRipple(On.Celeste.DreamBlock.orig_FootstepRipple orig, DreamBlock dreamBlock, Vector2 pos)
-    {
-        if (dreamBlock is ConnectedDreamBlock connectedBlock)
-            connectedBlock.ConnectedFootstepRipple(pos);
-        else
-            orig(dreamBlock, pos);
+        }
     }
 
     #endregion

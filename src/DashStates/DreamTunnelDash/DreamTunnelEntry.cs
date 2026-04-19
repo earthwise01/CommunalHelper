@@ -18,7 +18,6 @@ using static Celeste.Mod.CommunalHelper.DashStates.DreamTunnelDash;
 * Add Feather particles/functionality
 * Add Dreamblock activate/deactivate routines
 * Two modes, one uses deactivated texture and blocks dashcollides, other fades away and does not block
-* Add support for PandorasBox DreamDash controller
 * Add OneUse mode
 * Add interaction with DreamTunnelDash
 */
@@ -75,6 +74,8 @@ public class DreamTunnelEntry : AbstractDashCollisionPanel
     private readonly int originalDepth;
 
     private DreamBlockDummy dummy;
+
+    private bool isAwake;
 
     public DreamTunnelEntry(Vector2 position, float size, Spikes.Directions orientation, bool overrideAllowStaticMovers, int depth)
         : base(position, size, orientation, overrideAllowStaticMovers)
@@ -241,8 +242,6 @@ public class DreamTunnelEntry : AbstractDashCollisionPanel
             OnDeactivateNoRoutine = DeactivateNoRoutine,
             OnSetup = Setup
         });
-
-        Setup();
     }
 
     public override void Awake(Scene scene)
@@ -250,6 +249,9 @@ public class DreamTunnelEntry : AbstractDashCollisionPanel
         base.Awake(scene);
 
         scene.Tracker.GetEntity<DreamTunnelEntryRenderer>().Track(this, originalDepth);
+
+        isAwake = true;
+        Setup();
     }
 
     protected override void Destroy()
@@ -396,6 +398,10 @@ public class DreamTunnelEntry : AbstractDashCollisionPanel
 
     private void Setup()
     {
+        // necessary to be able to get the dream dash controller particle colors
+        if (!isAwake)
+            return;
+
         particles = new DreamParticle[(int) (Width / 4f * (Height / 4f) * 0.5f)];
 
         Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _,
