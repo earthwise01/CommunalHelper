@@ -129,8 +129,8 @@ public class ConnectedMoveBlock : ConnectedSolid
     protected readonly bool redirectIsPersistent;
 
     // when moving, ignore these solid types
-    protected readonly IEnumerable<Type> ignores;
-    protected bool HasIgnores => ignores.Count() > 0;
+    protected readonly Type[] ignores;
+    protected bool HasIgnores => ignores.Length > 0;
 
     public ConnectedMoveBlock(EntityData data, Vector2 offset)
         : this(data.Position + offset, data.Width, data.Height, data.Enum<MoveBlock.Directions>("direction"), data.Bool("fast") ? 75f : data.Float("moveSpeed", 60f))
@@ -214,7 +214,7 @@ public class ConnectedMoveBlock : ConnectedSolid
 
         redirectIsPersistent = data.Bool("redirectIsPersistent", true);
 
-        ignores = data.String("ignore", "").Split(',').SelectMany(EntityRegistry.GetKnownTypesFromSid);
+        ignores = data.Types("ignore");
     }
 
     public ConnectedMoveBlock(Vector2 position, int width, int height, MoveBlock.Directions direction, float moveSpeed)
@@ -584,22 +584,14 @@ public class ConnectedMoveBlock : ConnectedSolid
     {
         if (speed.X != 0f)
         {
-            if (HasIgnores)
-            {
-                if (ignores.ContainsAllFrom(CollideAll<Solid>(Position + speed.XComp()).Select(s => s.GetType())))
-                {
-                    MoveH(speed.X);
-                    return false;
-                }
-            }
-            if (MoveHCollideSolids(speed.X, thruDashBlocks: false))
+            if (this.MoveHCollideSolidsExcluding(ignores, speed.X))
             {
                 for (int i = 1; i <= 3; i++)
                 {
                     for (int num = 1; num >= -1; num -= 2)
                     {
-                        Vector2 value = new(Math.Sign(speed.X), i * num);
-                        if (!CollideCheck<Solid>(Position + value))
+                        Vector2 vector = new Vector2(Math.Sign(speed.X), i * num);
+                        if (!this.CollideCheckExcluding<Solid>(ignores, Position + vector))
                         {
                             MoveVExact(i * num);
                             MoveHExact(Math.Sign(speed.X));
@@ -613,29 +605,14 @@ public class ConnectedMoveBlock : ConnectedSolid
         }
         if (speed.Y != 0f)
         {
-            if (HasIgnores)
+            if (this.MoveVCollideSolidsExcluding(ignores, speed.Y))
             {
-                if (ignores.ContainsAllFrom(CollideAll<Solid>(Position + speed.YComp()).Select(s => s.GetType())))
-                {
-                    MoveV(speed.Y);
-                    return false;
-                }
-            }
-            if (MoveVCollideSolids(speed.Y, thruDashBlocks: false))
-            {
-                if (HasIgnores)
-                {
-                    if (ignores.ContainsAllFrom(CollideAll<Solid>().Select(s => s.GetType())))
-                    {
-                        return false;
-                    }
-                }
                 for (int j = 1; j <= 3; j++)
                 {
                     for (int num2 = 1; num2 >= -1; num2 -= 2)
                     {
-                        Vector2 value2 = new(j * num2, Math.Sign(speed.Y));
-                        if (!CollideCheck<Solid>(Position + value2))
+                        Vector2 vector2 = new Vector2(j * num2, Math.Sign(speed.Y));
+                        if (!this.CollideCheckExcluding<Solid>(ignores, Position + vector2))
                         {
                             MoveHExact(j * num2);
                             MoveVExact(Math.Sign(speed.Y));

@@ -65,10 +65,10 @@ public class CassetteMoveBlock : CustomCassetteBlock
     private readonly bool noDebris;
 
     // when moving, ignore these solid types
-    protected readonly IEnumerable<Type> ignores;
-    protected bool HasIgnores => ignores.Count() > 0;
+    protected readonly Type[] ignores;
+    protected bool HasIgnores => ignores.Length > 0;
 
-    public CassetteMoveBlock(Vector2 position, EntityID id, int width, int height, Directions direction, float moveSpeed, int index, float tempo, bool oldConnectionBehavior, Color? overrideColor, string spritePath, float sideAlpha, bool held, float crashTime, float regenTime, bool shakeOnCollision, bool noDebris, string ignores)
+    public CassetteMoveBlock(Vector2 position, EntityID id, int width, int height, Directions direction, float moveSpeed, int index, float tempo, bool oldConnectionBehavior, Color? overrideColor, string spritePath, float sideAlpha, bool held, float crashTime, float regenTime, bool shakeOnCollision, bool noDebris, Type[] ignores)
         : base(position, id, width, height, index, tempo, true, oldConnectionBehavior, dynamicHitbox: true, overrideColor, spritePath, sideAlpha, held)
     {
         startPosition = position;
@@ -125,11 +125,11 @@ public class CassetteMoveBlock : CustomCassetteBlock
             },
         });
 
-        this.ignores = ignores.Split(',').SelectMany(EntityRegistry.GetKnownTypesFromSid);
+        this.ignores = ignores;
     }
 
     public CassetteMoveBlock(EntityData data, Vector2 offset, EntityID id)
-        : this(data.Position + offset, id, data.Width, data.Height, data.Enum("direction", Directions.Left), data.Bool("fast") ? FastMoveSpeed : data.Float("moveSpeed", MoveSpeed), data.Int("index"), data.Float("tempo", 1f), data.Bool("oldConnectionBehavior", true), data.HexColorNullable("customColor"), data.Attr("spritePath", ""), data.Float("sideAlpha", 1f), data.Bool("held"), data.Float("crashTime", 0.15f), data.Float("regenTime", 3f), data.Bool("shakeOnCollision", true), data.Bool("noDebris"), data.String("ignore", ""))
+        : this(data.Position + offset, id, data.Width, data.Height, data.Enum("direction", Directions.Left), data.Bool("fast") ? FastMoveSpeed : data.Float("moveSpeed", MoveSpeed), data.Int("index"), data.Float("tempo", 1f), data.Bool("oldConnectionBehavior", true), data.HexColorNullable("customColor"), data.Attr("spritePath", ""), data.Float("sideAlpha", 1f), data.Bool("held"), data.Float("crashTime", 0.15f), data.Float("regenTime", 3f), data.Bool("shakeOnCollision", true), data.Bool("noDebris"), data.Types("ignore"))
     { }
 
     public override void Awake(Scene scene)
@@ -414,22 +414,14 @@ public class CassetteMoveBlock : CustomCassetteBlock
     {
         if (speed.X != 0f)
         {
-            if (HasIgnores)
-            {
-                if (ignores.ContainsAllFrom(CollideAll<Solid>(Position + speed.XComp()).Select(s => s.GetType())))
-                {
-                    MoveH(speed.X);
-                    return false;
-                }
-            }
-            if (MoveHCollideSolids(speed.X, thruDashBlocks: false))
+            if (this.MoveHCollideSolidsExcluding(ignores, speed.X))
             {
                 for (int i = 1; i <= 3; i++)
                 {
                     for (int num = 1; num >= -1; num -= 2)
                     {
-                        Vector2 value = new(Math.Sign(speed.X), i * num);
-                        if (!CollideCheck<Solid>(Position + value))
+                        Vector2 vector = new Vector2(Math.Sign(speed.X), i * num);
+                        if (!this.CollideCheckExcluding<Solid>(ignores, Position + vector))
                         {
                             MoveVExact(i * num);
                             MoveHExact(Math.Sign(speed.X));
@@ -443,22 +435,14 @@ public class CassetteMoveBlock : CustomCassetteBlock
         }
         if (speed.Y != 0f)
         {
-            if (HasIgnores)
-            {
-                if (ignores.ContainsAllFrom(CollideAll<Solid>(Position + speed.YComp()).Select(s => s.GetType())))
-                {
-                    MoveV(speed.Y);
-                    return false;
-                }
-            }
-            if (MoveVCollideSolids(speed.Y, thruDashBlocks: false))
+            if (this.MoveVCollideSolidsExcluding(ignores, speed.Y))
             {
                 for (int j = 1; j <= 3; j++)
                 {
                     for (int num2 = 1; num2 >= -1; num2 -= 2)
                     {
-                        Vector2 value2 = new(j * num2, Math.Sign(speed.Y));
-                        if (!CollideCheck<Solid>(Position + value2))
+                        Vector2 vector2 = new Vector2(j * num2, Math.Sign(speed.Y));
+                        if (!this.CollideCheckExcluding<Solid>(ignores, Position + vector2))
                         {
                             MoveHExact(j * num2);
                             MoveVExact(Math.Sign(speed.Y));
