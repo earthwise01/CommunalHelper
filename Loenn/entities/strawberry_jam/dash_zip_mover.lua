@@ -40,6 +40,7 @@ dashZipMover.placements = {
         ropeShadowColor = "003622",
         soundEvent = "event:/CommunalHelperEvents/game/strawberryJam/game/dash_zip_mover/zip_mover",
         slow = false,
+        linked = false
     }
 }
 
@@ -93,7 +94,11 @@ local function addBlockSprites(sprites, entity, blockTexture, lightsTexture, x, 
     lightsSprite:addPosition(math.floor(width / 2), 0)
     lightsSprite:setJustification(0.5, 0.0)
 
-    if entity.drawBlackBorder then table.insert(sprites, drawableRectangle.fromRectangle("fill", x - 1, y - 1, width + 2, height + 2, {0, 0, 0, 1})) end
+    if entity.drawBlackBorder then
+        local outlineRect = drawableRectangle.fromRectangle("fill", x - 1, y - 1, width + 2, height + 2, {0, 0, 0, 1})
+        outlineRect.depth = 5000
+        table.insert(sprites, outlineRect)
+    end
 
     table.insert(sprites, rectangle:getDrawableSprite())
 
