@@ -204,16 +204,16 @@ public class DashZipMover : Solid
                 }
             }
 
-            if (zipMover.drawBlackBorder)
+            if (zipMover.drawBlackBorder && CullHelper.IsRectangleVisible(zipMover.X, zipMover.Y, zipMover.Width, zipMover.Height, 10, level.Camera))
             {
-                Rectangle outline = new Rectangle(
-                    (int) (Math.Round(zipMover.X - (zipMover.scale.X - 1) * zipMover.Width / 2f) + zipMover.Shake.X),
-                    (int) (Math.Round(zipMover.Y - (zipMover.scale.Y - 1) * zipMover.Height / 2f) + zipMover.Shake.Y),
-                    (int) (zipMover.Width * 0.125f * MathF.Round(8 * zipMover.scale.X)),  // The width/height here needs to be handled relative to the Rounding value of the individually drawn patch segments
-                    (int) (zipMover.Height * 0.125f * MathF.Round(8 * zipMover.scale.Y))  // As opposed to the width. Round(8 * 2/3) * (x / 8) != Round(x * 2/3)
-                );
-                outline.Inflate(1, 1);
-                Draw.Rect(outline, Color.Black);
+                Vector2 position = zipMover.Position + zipMover.Shake;
+                int rectX = (int) Math.Round(position.X - zipMover.Width / 2f * (zipMover.scale.X - 1f));
+                int rectY = (int) Math.Round(position.Y - zipMover.Height / 2f * (zipMover.scale.Y - 1f));
+                int rectW = (int) Math.Round(position.X + zipMover.Width / 2f * (zipMover.scale.X + 1f)) - rectX;
+                int rectH = (int) Math.Round(position.Y + zipMover.Height / 2f * (zipMover.scale.Y + 1f)) - rectY;
+                Rectangle outlineRect = new Rectangle(rectX - 1, rectY - 1, rectW + 2, rectH + 2);
+
+                Draw.Rect(outlineRect, Color.Black);
             }
         }
     }
@@ -278,7 +278,8 @@ public class DashZipMover : Solid
         streetlight.Play("frames");
         streetlight.Active = false;
         streetlight.SetAnimationFrame(1);
-        streetlight.Position = new Vector2(Width / 2f - streetlight.Width / 2f, 0f);
+        streetlight.Origin = new Vector2(streetlight.Width / 2f, Height / 2f);
+        streetlight.Position = new Vector2(Width / 2f, Height / 2f);
 
         Add(bloom = new BloomPoint(1f, 6f));
         bloom.Position = new Vector2(Width / 2f, 10f);
@@ -294,7 +295,7 @@ public class DashZipMover : Solid
         this.moveSound = moveSound;
 
         sfx = new SoundSource();
-        sfx.Position = new Vector2(Width, Height) / 2f;
+        sfx.Position = new Vector2(Width / 2f, Height / 2f);
         Add(sfx);
 
         pathRenderer = new DashZipMoverPathRenderer(this, nodes, spritePath + "cog", Calc.HexToColor(ropeColorCode), Calc.HexToColor(ropeLightColorCode), Calc.HexToColor(ropeShadowColorCode));
@@ -334,6 +335,17 @@ public class DashZipMover : Solid
         scene.Add(pathRenderer);
     }
 
+    public override void Awake(Scene scene)
+    {
+        base.Awake(scene);
+
+        foreach (StaticMover staticMover in staticMovers)
+        {
+            if (staticMover.Entity is Spikes spikes)
+                spikes.SetOrigins(Center);
+        }
+    }
+
     public override void Removed(Scene scene)
     {
         scene.Remove(pathRenderer);
@@ -348,28 +360,38 @@ public class DashZipMover : Solid
 
         scale = Calc.Approach(scale, Vector2.One, 3f * Engine.DeltaTime);
 
+        foreach (StaticMover staticMover in staticMovers)
+        {
+            if (staticMover.Entity is not Spikes spikes)
+                continue;
+
+            foreach (Component component in spikes.Components)
+            {
+                if (component is Image image)
+                    image.Scale = scale;
+            }
+        }
+
         streetlight.Scale = scale;
-        Vector2 zeroCenter = new Vector2(Width, Height) / 2f;
-        streetlight.Position = zeroCenter + (new Vector2(zeroCenter.X - streetlight.Width / 2f, 0) - zeroCenter) * scale;
 
         bloom.Visible = streetlight.CurrentAnimationFrame != 0;
     }
 
     public override void Render()
     {
-        if (!CullHelper.IsRectangleVisible(X, Y, Width, Height, 10, SceneAs<Level>().Camera))
+        if (Scene is not Level level || !CullHelper.IsRectangleVisible(X, Y, Width, Height, 10, level.Camera))
             return;
 
         Vector2 position = Position;
         Position += Shake;
 
-        Rectangle rect = new Rectangle(
-            (int) (Center.X + (X + 2 - Center.X) * scale.X),
-            (int) (Center.Y + (Y + 2 - Center.Y) * scale.Y),
-            (int) ((Width - 4) * scale.X),
-            (int) ((Height - 4) * scale.Y));
+        int rectX = (int) Math.Round(X - Width / 2f * (scale.X - 1f));
+        int rectY = (int) Math.Round(Y - Height / 2f * (scale.Y - 1f));
+        int rectW = (int) Math.Round(X + Width / 2f * (scale.X + 1f)) - rectX;
+        int rectH = (int) Math.Round(Y + Height / 2f * (scale.Y + 1f)) - rectY;
+        Rectangle backRect = new Rectangle(rectX + 2, rectY + 2, rectW - 4, rectH - 4);
 
-        Draw.Rect(rect, Color.Black);
+        Draw.Rect(backRect, Color.Black);
 
         int offset = 1;
         float angle = 0f;
