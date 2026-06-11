@@ -900,6 +900,8 @@ entities.CommunalHelper/SJ/DashZipMover.attributes.description.ropeLightColor=Th
 entities.CommunalHelper/SJ/DashZipMover.attributes.description.ropeShadowColor=The rope's shadow color.
 entities.CommunalHelper/SJ/DashZipMover.attributes.description.soundEvent=The sound event that plays when the Zip Mover is activated.
 entities.CommunalHelper/SJ/DashZipMover.attributes.description.slow=Makes the Zip Mover slower.\nTo make up for the slower speed, it slams harder, allowing for more liftspeed.
+entities.CommunalHelper/SJ/DashZipMover.attributes.description.permanent=Whether the Zip Mover should lock in place after reaching its last node.
+entities.CommunalHelper/SJ/DashZipMover.attributes.description.waiting=Whether the Zip Mover should wait the player to trigger it at each node.\nOnly useful if has more than one node.
 entities.CommunalHelper/SJ/DashZipMover.attributes.description.linked=Whether the Zip Mover is linked to other Zip Movers with the same rope color.\nWhen a linked Zip Mover gets activated, all other Zip Movers linked to that rope color will be activated as well.
 
 # [Strawberry Jam] Flag Breaker Box 

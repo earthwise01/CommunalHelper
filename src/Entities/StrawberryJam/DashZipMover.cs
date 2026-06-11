@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using Celeste.Mod.Helpers;
 
 namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam;
 
@@ -8,41 +9,154 @@ public class DashZipMover : Solid
 {
     private class DashZipMoverPathRenderer : Entity
     {
+        private class Segment
+        {
+            private readonly Vector2 from, to;
+            private readonly Vector2 dir, perp;
+            private readonly float length;
+
+            private readonly Vector2 ropeOffsetA, ropeOffsetB;
+
+            private readonly Vector2 sparkAdd;
+            private readonly float sparkDirFromA, sparkDirFromB;
+            private readonly float sparkDirToA, sparkDirToB;
+
+            public readonly Rectangle Bounds;
+            public bool Visible;
+
+            public Segment(Vector2 from, Vector2 to)
+            {
+                this.from = from;
+                this.to = to;
+
+                dir = (to - from).SafeNormalize();
+                perp = dir.Perpendicular();
+                ropeOffsetA = perp * 4f;
+                ropeOffsetB = -perp * 4f;
+
+                sparkAdd = (from - to).SafeNormalize(5f).Perpendicular();
+                float angle = (from - to).Angle();
+                length = (to - from).Length();
+
+                sparkDirFromA = angle + MathF.PI / 8f;
+                sparkDirFromB = angle - MathF.PI / 8f;
+                sparkDirToA = angle + MathF.PI - MathF.PI / 8f;
+                sparkDirToB = angle + MathF.PI + MathF.PI / 8f;
+
+                Bounds = Util.Rectangle(from, to);
+                Bounds.Inflate(10, 10);
+            }
+
+            public void CreateSparks(Level level)
+            {
+                level.ParticlesBG.Emit(ZipMover.P_Sparks, from + sparkAdd + Calc.Random.Range(-Vector2.One, Vector2.One), sparkDirFromA);
+                level.ParticlesBG.Emit(ZipMover.P_Sparks, from - sparkAdd + Calc.Random.Range(-Vector2.One, Vector2.One), sparkDirFromB);
+                level.ParticlesBG.Emit(ZipMover.P_Sparks, to + sparkAdd + Calc.Random.Range(-Vector2.One, Vector2.One), sparkDirToA);
+                level.ParticlesBG.Emit(ZipMover.P_Sparks, to - sparkAdd + Calc.Random.Range(-Vector2.One, Vector2.One), sparkDirToB);
+            }
+
+            public void Render(float percent, Color color, Color lightColor)
+            {
+                if (length <= 0)
+                    return;
+
+                Vector2 ropeFromA = from + ropeOffsetA + Vector2.UnitY;
+                Vector2 ropeFromB = to + ropeOffsetB + Vector2.UnitY;
+
+                float shiftProgress = 4f - percent * MathF.PI * 8f;
+                for (float num = shiftProgress % 4f; num < length; num += 4f)
+                {
+                    float progress = num / length;
+                    float sinAmplitude = progress * (1 - progress) * 8f;
+                    Vector2 sinOffset = perp * MathF.Sin(num) * sinAmplitude;
+
+                    Vector2 ropeToA = from + ropeOffsetA + dir * num + sinOffset;
+                    Vector2 ropeToB = to + ropeOffsetB - dir * num + sinOffset;
+
+                    // main vine rope
+                    Draw.Line(ropeFromA, ropeToA, color);
+                    Draw.Line(ropeFromB, ropeToB, color);
+
+                    // leaves
+                    Draw.Line(ropeToA, ropeToA + dir * 4f, lightColor);
+                    Draw.Line(ropeToB, ropeToB - dir * 4f, lightColor);
+
+                    ropeFromA = ropeToA;
+                    ropeFromB = ropeToB;
+                }
+            }
+
+            public void RenderShadow(float percent, Color shadowColor)
+            {
+                if (length <= 0)
+                    return;
+
+                Vector2 ropeFromA = from + ropeOffsetA + Vector2.UnitY;
+                Vector2 ropeFromB = to + ropeOffsetB + Vector2.UnitY;
+
+                float shiftProgress = 4f - percent * MathF.PI * 8f;
+                for (float num = shiftProgress % 4f; num < length; num += 4f)
+                {
+                    float progress = num / length;
+                    float sinAmplitude = progress * (1 - progress) * 8f;
+                    Vector2 sinOffset = perp * MathF.Sin(num) * sinAmplitude;
+
+                    Vector2 ropeToA = from + ropeOffsetA + dir * num + sinOffset + Vector2.UnitY;
+                    Vector2 ropeToB = to + ropeOffsetB - dir * num + sinOffset + Vector2.UnitY;
+
+                    // thicker vine rope as sort of outline
+                    Draw.Line(ropeFromA, ropeToA, shadowColor, 3);
+                    Draw.Line(ropeFromB, ropeToB, shadowColor, 3);
+
+                    // leaves
+                    Draw.Line(ropeToA, ropeToA + dir * 4f, shadowColor);
+                    Draw.Line(ropeToB, ropeToB - dir * 4f, shadowColor);
+
+                    ropeFromA = ropeToA;
+                    ropeFromB = ropeToB;
+                }
+            }
+        }
+
         private readonly DashZipMover zipMover;
+
+        private readonly Rectangle bounds;
+
+        private readonly Vector2[] nodes;
+        private readonly Segment[] segments;
 
         private readonly MTexture cog;
 
-        private readonly Vector2 from;
-        private readonly Vector2 to;
+        private readonly Color ropeColor;
+        private readonly Color ropeLightColor;
+        private readonly Color ropeShadowColor;
 
-        private readonly Vector2 sparkAdd;
-        private readonly float sparkDirFromA;
-        private readonly float sparkDirFromB;
-        private readonly float sparkDirToA;
-        private readonly float sparkDirToB;
-
-        private readonly float length;
-
-        private readonly Color ropeColor = Calc.HexToColor("046e19");
-        private readonly Color ropeLightColor = Calc.HexToColor("329415");
-        private readonly Color ropeShadowColor = Calc.HexToColor("003622");
-
-        public DashZipMoverPathRenderer(DashZipMover zipMover, string cogSprite, Color ropeColor, Color ropeLightColor, Color ropeShadowColor)
+        public DashZipMoverPathRenderer(DashZipMover zipMover, Vector2[] nodes,
+            string cogSprite, Color ropeColor, Color ropeLightColor, Color ropeShadowColor)
         {
             Depth = Depths.SolidsBelow;
+
             this.zipMover = zipMover;
 
-            from = zipMover.start + new Vector2(zipMover.Width / 2f, zipMover.Height / 2f);
-            to = zipMover.target + new Vector2(zipMover.Width / 2f, zipMover.Height / 2f);
+            Vector2 centerOffset = new Vector2(zipMover.Width / 2f, zipMover.Height / 2f);
+            this.nodes = new Vector2[nodes.Length];
 
-            sparkAdd = (from - to).SafeNormalize(5f).Perpendicular();
-            float angle = (from - to).Angle();
-            length = (to - from).Length();
+            Vector2 prevNode = this.nodes[0] = nodes[0] + centerOffset;
+            (Vector2 min, Vector2 max) = (prevNode, prevNode);
 
-            sparkDirFromA = angle + MathF.PI / 8f;
-            sparkDirFromB = angle - MathF.PI / 8f;
-            sparkDirToA = angle + MathF.PI - MathF.PI / 8f;
-            sparkDirToB = angle + MathF.PI + MathF.PI / 8f;
+            segments = new Segment[nodes.Length - 1];
+            for (int i = 0; i < segments.Length; i++)
+            {
+                Vector2 node = this.nodes[i + 1] = nodes[i + 1] + centerOffset;
+                segments[i] = new Segment(prevNode, node);
+
+                (min, max) = (Util.Min(min, node), Util.Max(max, node));
+
+                prevNode = node;
+            }
+
+            bounds = new Rectangle((int) min.X, (int) min.Y, (int) (max.X - min.X), (int) (max.Y - min.Y));
+            bounds.Inflate(10, 10);
 
             cog = GFX.Game[cogSprite];
 
@@ -53,18 +167,41 @@ public class DashZipMover : Solid
 
         public void CreateSparks()
         {
-            SceneAs<Level>().ParticlesBG.Emit(ZipMover.P_Sparks, from + sparkAdd + Calc.Random.Range(-Vector2.One, Vector2.One), sparkDirFromA);
-            SceneAs<Level>().ParticlesBG.Emit(ZipMover.P_Sparks, from - sparkAdd + Calc.Random.Range(-Vector2.One, Vector2.One), sparkDirFromB);
-            SceneAs<Level>().ParticlesBG.Emit(ZipMover.P_Sparks, to + sparkAdd + Calc.Random.Range(-Vector2.One, Vector2.One), sparkDirToA);
-            SceneAs<Level>().ParticlesBG.Emit(ZipMover.P_Sparks, to - sparkAdd + Calc.Random.Range(-Vector2.One, Vector2.One), sparkDirToB);
+            if (Scene is not Level level)
+                return;
+
+            foreach (Segment segment in segments)
+                segment.CreateSparks(level);
         }
 
         public override void Render()
         {
-            if (length != 0f)
+            if (Scene is not Level level)
+                return;
+
+            Rectangle cameraBounds = level.Camera.GetBounds();
+
+            if (cameraBounds.Intersects(bounds))
             {
-                DrawCogs(Vector2.UnitY, ropeShadowColor);
-                DrawCogs(Vector2.Zero);
+                float percent = zipMover.percent;
+
+                foreach (Segment segment in segments)
+                {
+                    segment.Visible = cameraBounds.Intersects(segment.Bounds);
+                    if (segment.Visible)
+                        segment.RenderShadow(percent, ropeShadowColor);
+                }
+
+                foreach (Segment segment in segments)
+                    if (segment.Visible)
+                        segment.Render(percent, ropeColor, ropeLightColor);
+
+                float cogRotation = zipMover.percent * MathF.PI * 2f;
+                foreach (Vector2 node in nodes)
+                {
+                    cog.DrawCentered(node + Vector2.UnitY, ropeShadowColor, 1f, cogRotation);
+                    cog.DrawCentered(node, Color.White, 1f, cogRotation);
+                }
             }
 
             if (zipMover.drawBlackBorder)
@@ -78,48 +215,6 @@ public class DashZipMover : Solid
                 outline.Inflate(1, 1);
                 Draw.Rect(outline, Color.Black);
             }
-        }
-
-        private void DrawCogs(Vector2 offset, Color? colorOverride = null)
-        {
-            Vector2 direction = (to - from).SafeNormalize();
-            Vector2 perp = direction.Perpendicular();
-            Vector2 ropeOffsetA = perp * 4f;
-            Vector2 ropeOffsetB = -perp * 4f;
-
-            Vector2 ropeFromA = from + ropeOffsetA + offset;
-            Vector2 ropeFromB = to + ropeOffsetB + offset;
-            for (float num = 4f - zipMover.percent * MathF.PI * 8f % 4f; num < length; num += 4f)
-            {
-                float progress = num / length;
-                float sinAmount = progress * (1 - progress) * 8f;
-                Vector2 sinOffset = perp * MathF.Sin(num) * sinAmount;
-
-                Vector2 ropeToA = from + ropeOffsetA + direction * num + sinOffset + offset;
-                Vector2 ropeToB = to + ropeOffsetB - direction * num + sinOffset + offset;
-
-                // Thicker vine rope, in the back, sort of outline
-                if (colorOverride is not null)
-                {
-                    Draw.Line(ropeFromA, ropeToA, (Color) colorOverride, 3);
-                    Draw.Line(ropeFromB, ropeToB, (Color) colorOverride, 3);
-                }
-
-                // Main "vine rope"
-                Draw.Line(ropeFromA, ropeToA, colorOverride ?? ropeColor);
-                Draw.Line(ropeFromB, ropeToB, colorOverride ?? ropeColor);
-
-                // Leaves
-                Draw.Line(ropeToA, ropeToA + direction * 4f, colorOverride ?? ropeLightColor);
-                Draw.Line(ropeToB, ropeToB - direction * 4f, colorOverride ?? ropeLightColor);
-
-                ropeFromA = ropeToA;
-                ropeFromB = ropeToB;
-            }
-
-            float cogRotation = zipMover.percent * MathF.PI * 2f;
-            cog.DrawCentered(from + offset, colorOverride ?? Color.White, 1f, cogRotation);
-            cog.DrawCentered(to + offset, colorOverride ?? Color.White, 1f, cogRotation);
         }
     }
 
@@ -135,8 +230,7 @@ public class DashZipMover : Solid
     private readonly List<MTexture> innerCogTextures;
     private readonly MTexture tempTexture = new();
 
-    private Vector2 start;
-    private Vector2 target;
+    private readonly Vector2[] nodes;
     private float percent;
     private bool triggered;
 
@@ -145,20 +239,25 @@ public class DashZipMover : Solid
     private readonly bool drawBlackBorder;
     private readonly string moveSound;
     private readonly bool slow;
+    private readonly bool permanent;
+    private readonly bool waiting;
     private readonly string linkFlag;
 
     private static readonly Ease.Easer EaseSevenHalves = Util.MakeCustomEaser(3.5f);
 
-    public DashZipMover(Vector2 position, int width, int height, Vector2 target,
+    public DashZipMover(Vector2 position, int width, int height, Vector2[] nodes,
         string spritePath, bool drawBlackBorder,
         string ropeColorCode, string ropeLightColorCode, string ropeShadowColorCode,
-        string moveSound, bool slow, bool linked)
+        string moveSound, bool slow, bool permanent, bool waiting, bool linked)
         : base(position, width, height, safe: false)
     {
         Depth = Depths.FGTerrain + 1;
-        start = Position;
-        this.target = target;
+
+        this.nodes = nodes;
+
         this.slow = slow;
+        this.permanent = permanent;
+        this.waiting = waiting;
 
         if (linked)
             linkFlag = $"ZipMoverSync:{ropeColorCode}"; // matches Adventure Helper
@@ -198,11 +297,11 @@ public class DashZipMover : Solid
         sfx.Position = new Vector2(Width, Height) / 2f;
         Add(sfx);
 
-        pathRenderer = new DashZipMoverPathRenderer(this, spritePath + "cog", Calc.HexToColor(ropeColorCode), Calc.HexToColor(ropeLightColorCode), Calc.HexToColor(ropeShadowColorCode));
+        pathRenderer = new DashZipMoverPathRenderer(this, nodes, spritePath + "cog", Calc.HexToColor(ropeColorCode), Calc.HexToColor(ropeLightColorCode), Calc.HexToColor(ropeShadowColorCode));
     }
 
     public DashZipMover(EntityData data, Vector2 offset)
-        : this(data.Position + offset, data.Width, data.Height, data.Nodes[0] + offset,
+        : this(data.Position + offset, data.Width, data.Height, data.NodesWithPosition(offset),
             data.Attr("spritePath", "objects/CommunalHelper/strawberryJam/dashZipMover/"),
             data.Bool("drawBlackBorder", false),
             data.Attr("ropeColor", "046e19"),
@@ -210,6 +309,8 @@ public class DashZipMover : Solid
             data.Attr("ropeShadowColor", "003622"),
             data.Attr("soundEvent", CustomSFX.game_strawberryJam_dash_zip_mover_zip_mover),
             data.Bool("slow", false),
+            data.Bool("permanent", false),
+            data.Bool("waiting", false),
             data.Bool("linked", false))
     { }
 
@@ -250,10 +351,15 @@ public class DashZipMover : Solid
         streetlight.Scale = scale;
         Vector2 zeroCenter = new Vector2(Width, Height) / 2f;
         streetlight.Position = zeroCenter + (new Vector2(zeroCenter.X - streetlight.Width / 2f, 0) - zeroCenter) * scale;
+
+        bloom.Visible = streetlight.CurrentAnimationFrame != 0;
     }
 
     public override void Render()
     {
+        if (!CullHelper.IsRectangleVisible(X, Y, Width, Height, 10, SceneAs<Level>().Camera))
+            return;
+
         Vector2 position = Position;
         Position += Shake;
 
@@ -407,50 +513,85 @@ public class DashZipMover : Solid
 
             SignalLinkedZipMovers(true);
 
-            if (isMainZipMover)
+            for (int i = 1; i < nodes.Length; i++)
             {
-                sfx.Play(moveSound);
-                sfx.instance.setPitch(1f / slownessFactor);
+                Vector2 from = nodes[i - 1];
+                Vector2 to = nodes[i];
+
+                if (isMainZipMover)
+                    sfx.Play(moveSound)
+                       .instance.setPitch(1f / slownessFactor);
+
+                Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
+                StartShaking(0.1f * slownessFactor);
+                yield return 0.1f * slownessFactor;
+
+                SignalLinkedZipMovers(false);
+
+                streetlight.SetAnimationFrame(3);
+                StopPlayerRunIntoAnimation = false;
+
+                float at = 0f;
+                while (at < 1f)
+                {
+                    yield return null;
+
+                    at = Calc.Approach(at, 1f, 2f * Engine.DeltaTime * (1f / slownessFactor));
+                    percent = slow ? EaseSevenHalves(at) : Ease.SineIn(at);
+
+                    if (Scene.OnInterval(0.03f))
+                        SpawnScrapeParticles(to);
+                    if (Scene.OnInterval(0.1f))
+                        pathRenderer.CreateSparks();
+
+                    Vector2 position = Vector2.Lerp(from, to, percent);
+                    MoveTo(position);
+                }
+
+                SceneAs<Level>().Shake();
+                Input.Rumble(RumbleStrength.Strong, RumbleLength.Medium);
+                StartShaking(0.2f * slownessFactor);
+                streetlight.SetAnimationFrame(2);
+                StopPlayerRunIntoAnimation = true;
+                yield return 0.5f * slownessFactor;
+
+                sfx.Stop();
+
+                bool reachedLastNode = i == nodes.Length - 1;
+
+                if (waiting && !reachedLastNode)
+                {
+                    streetlight.SetAnimationFrame(1);
+                    triggered = false;
+
+                    while (!ShouldActivate(out isMainZipMover))
+                        yield return null;
+
+                    SignalLinkedZipMovers(true);
+                }
             }
 
-            Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
-            StartShaking(0.1f * slownessFactor);
-            yield return 0.1f * slownessFactor;
-
-            SignalLinkedZipMovers(false);
-
-            streetlight.SetAnimationFrame(3);
-            StopPlayerRunIntoAnimation = false;
-
-            float at = 0f;
-            while (at < 1f)
+            if (permanent)
             {
-                yield return null;
+                if (isMainZipMover)
+                {
+                    // close enough
+                    Audio.Play($"event:/CommunalHelperEvents/game/zipMover/moon/finish", Center)
+                         .setPitch(1f / slownessFactor);
+                    Audio.Play($"event:/CommunalHelperEvents/game/zipMover/moon/tick", Center)
+                         .setPitch(1f / slownessFactor);
+                }
 
-                at = Calc.Approach(at, 1f, 2f * Engine.DeltaTime * (1f / slownessFactor));
-                percent = slow ? EaseSevenHalves(at) : Ease.SineIn(at);
+                SceneAs<Level>().Shake(0.15f);
+                StartShaking(0.3f);
+                streetlight.SetAnimationFrame(0);
 
-                if (Scene.OnInterval(0.03f))
-                    SpawnScrapeParticles(target);
-                if (Scene.OnInterval(0.1f))
-                    pathRenderer.CreateSparks();
-
-                Vector2 position = Vector2.Lerp(start, target, percent);
-                MoveTo(position);
+                yield break;
             }
-
-            SceneAs<Level>().Shake();
-            Input.Rumble(RumbleStrength.Strong, RumbleLength.Medium);
-            StartShaking(0.2f * slownessFactor);
-            streetlight.SetAnimationFrame(2);
-            StopPlayerRunIntoAnimation = true;
-            yield return 0.5f * slownessFactor;
 
             streetlight.SetAnimationFrame(1);
             triggered = false;
-            target = start;
-            start = Position;
-            sfx.Stop();
+            Array.Reverse(nodes);
         }
     }
 }

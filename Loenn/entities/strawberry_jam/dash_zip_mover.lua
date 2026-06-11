@@ -3,6 +3,7 @@ local drawableLine = require("structs.drawable_line")
 local drawableNinePatch = require("structs.drawable_nine_patch")
 local drawableRectangle = require("structs.drawable_rectangle")
 local utils = require("utils")
+local communalHelper = require("mods").requireFromPlugin("libraries.communal_helper")
 
 local dashZipMover = {}
 
@@ -26,7 +27,7 @@ local defaultRopeColor = "065217"
 dashZipMover.name = "CommunalHelper/SJ/DashZipMover"
 dashZipMover.depth = -9999
 dashZipMover.nodeVisibility = "never"
-dashZipMover.nodeLimits = {1, 1}
+dashZipMover.nodeLimits = {1, -1}
 dashZipMover.minimumSize = {16, 16}
 dashZipMover.placements = {
     name = "main",
@@ -40,6 +41,8 @@ dashZipMover.placements = {
         ropeShadowColor = "003622",
         soundEvent = "event:/CommunalHelperEvents/game/strawberryJam/game/dash_zip_mover/zip_mover",
         slow = false,
+        permanent = false,
+        waiting = false,
         linked = false
     }
 }
@@ -55,33 +58,6 @@ dashZipMover.fieldInformation = {
         fieldType = "color"
     }
 }
-
-local function addNodeSprites(sprites, entity, cogTexture, centerX, centerY, centerNodeX, centerNodeY)
-    local nodeCogSprite = drawableSprite.fromTexture(cogTexture, entity)
-
-    nodeCogSprite:setPosition(centerNodeX, centerNodeY)
-    nodeCogSprite:setJustification(0.5, 0.5)
-
-    local points = {centerX, centerY, centerNodeX, centerNodeY}
-    local leftLine = drawableLine.fromPoints(points, entity.ropeColor or defaultRopeColor, 1)
-    local rightLine = drawableLine.fromPoints(points, entity.ropeColor or defaultRopeColor, 1)
-
-    leftLine:setOffset(0, 4.5)
-    rightLine:setOffset(0, -4.5)
-
-    leftLine.depth = 5000
-    rightLine.depth = 5000
-
-    for _, sprite in ipairs(leftLine:getDrawableSprite()) do
-        table.insert(sprites, sprite)
-    end
-
-    for _, sprite in ipairs(rightLine:getDrawableSprite()) do
-        table.insert(sprites, sprite)
-    end
-
-    table.insert(sprites, nodeCogSprite)
-end
 
 local function addBlockSprites(sprites, entity, blockTexture, lightsTexture, x, y, width, height)
     local rectangle = drawableRectangle.fromRectangle("fill", x + 2, y + 2, width - 4, height - 4, centerColor)
@@ -117,12 +93,14 @@ function dashZipMover.sprite(room, entity)
     local halfWidth, halfHeight = math.floor(entity.width / 2), math.floor(entity.height / 2)
 
     local nodes = entity.nodes or {{x = 0, y = 0}}
-    local nodeX, nodeY = nodes[1].x, nodes[1].y
+    local cogSprite = themeTextures(entity).nodeCog
+    local ropeColor = entity.ropeColor or defaultRopeColor
 
-    local centerX, centerY = x + halfWidth, y + halfHeight
-    local centerNodeX, centerNodeY = nodeX + halfWidth, nodeY + halfHeight
+    local nodeSprites = communalHelper.getZipMoverNodeSprites(x, y, width, height, nodes, cogSprite, {1, 1, 1}, ropeColor)
+    for _, sprite in ipairs(nodeSprites) do
+        table.insert(sprites, sprite)
+    end
 
-    addNodeSprites(sprites, entity, themeTextures(entity).nodeCog, centerX, centerY, centerNodeX, centerNodeY)
     addBlockSprites(sprites, entity, themeTextures(entity).block, themeTextures(entity).lights, x, y, width, height)
 
     return sprites
@@ -133,18 +111,20 @@ function dashZipMover.selection(room, entity)
     local width, height = entity.width or 8, entity.height or 8
     local halfWidth, halfHeight = math.floor(entity.width / 2), math.floor(entity.height / 2)
 
-    local nodes = entity.nodes or {{x = 0, y = 0}}
-    local nodeX, nodeY = nodes[1].x, nodes[1].y
-    local centerNodeX, centerNodeY = nodeX + halfWidth, nodeY + halfHeight
-
+    local mainRectangle = utils.rectangle(x, y, width, height)
 
     local cogSprite = drawableSprite.fromTexture(themeTextures(entity).nodeCog, entity)
     local cogWidth, cogHeight = cogSprite.meta.width, cogSprite.meta.height
 
-    local mainRectangle = utils.rectangle(x, y, width, height)
-    local nodeRectangle = utils.rectangle(centerNodeX - math.floor(cogWidth / 2), centerNodeY - math.floor(cogHeight / 2), cogWidth, cogHeight)
+    local nodes = entity.nodes or {{x = 0, y = 0}}
+    local nodeRectangles = {}
+    for _, node in ipairs(nodes) do
+        local centerNodeX, centerNodeY = node.x + halfWidth, node.y + halfHeight
 
-    return mainRectangle, {nodeRectangle}
+        table.insert(nodeRectangles, utils.rectangle(centerNodeX - math.floor(cogWidth / 2), centerNodeY - math.floor(cogHeight / 2), cogWidth, cogHeight))
+    end
+
+    return mainRectangle, nodeRectangles
 end
 
 return dashZipMover
