@@ -238,6 +238,7 @@ public class DashZipMover : Solid
 
     private readonly bool drawBlackBorder;
     private readonly string moveSound;
+    private readonly float hitCooldownTime;
     private readonly bool slow;
     private readonly bool permanent;
     private readonly bool waiting;
@@ -248,13 +249,14 @@ public class DashZipMover : Solid
     public DashZipMover(Vector2 position, int width, int height, Vector2[] nodes,
         string spritePath, bool drawBlackBorder,
         string ropeColorCode, string ropeLightColorCode, string ropeShadowColorCode,
-        string moveSound, bool slow, bool permanent, bool waiting, bool linked)
+        string moveSound, float hitCooldownTime, bool slow, bool permanent, bool waiting, bool linked)
         : base(position, width, height, safe: false)
     {
         Depth = Depths.FGTerrain + 1;
 
         this.nodes = nodes;
 
+        this.hitCooldownTime = hitCooldownTime;
         this.slow = slow;
         this.permanent = permanent;
         this.waiting = waiting;
@@ -309,6 +311,7 @@ public class DashZipMover : Solid
             data.Attr("ropeLightColor", "329415"),
             data.Attr("ropeShadowColor", "003622"),
             data.Attr("soundEvent", CustomSFX.game_strawberryJam_dash_zip_mover_zip_mover),
+            data.Float("hitCooldown", 0.5f),
             data.Bool("slow", false),
             data.Bool("permanent", false),
             data.Bool("waiting", false),
@@ -575,7 +578,8 @@ public class DashZipMover : Solid
                 StartShaking(0.2f * slownessFactor);
                 streetlight.SetAnimationFrame(2);
                 StopPlayerRunIntoAnimation = true;
-                yield return 0.5f * slownessFactor;
+                if (hitCooldownTime > 0f)
+                    yield return hitCooldownTime * slownessFactor;
 
                 sfx.Stop();
 
