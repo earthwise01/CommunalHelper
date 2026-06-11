@@ -59,25 +59,31 @@ dashZipMover.fieldInformation = {
     }
 }
 
-local function addBlockSprites(sprites, entity, blockTexture, lightsTexture, x, y, width, height)
-    local rectangle = drawableRectangle.fromRectangle("fill", x + 2, y + 2, width - 4, height - 4, centerColor)
-
-    local frameNinePatch = drawableNinePatch.fromTexture(blockTexture, blockNinePatchOptions, x, y, width, height)
-    local frameSprites = frameNinePatch:getDrawableSprite()
-
-    local lightsSprite = drawableSprite.fromTexture(lightsTexture, entity)
-
-    lightsSprite:addPosition(math.floor(width / 2), 0)
-    lightsSprite:setJustification(0.5, 0.0)
+local function addBlockSprites(sprites, entity, blockTexture, lightsTexture, x, y, width, height, alpha)
+    alpha = alpha or 1
+    local backColor = {0, 0, 0, alpha}
+    local blockColor = {1, 1, 1, alpha}
 
     if entity.drawBlackBorder then
-        local outlineRect = drawableRectangle.fromRectangle("fill", x - 1, y - 1, width + 2, height + 2, {0, 0, 0, 1})
+        local outlineRect = drawableRectangle.fromRectangle(alpha ~= 1 and "line" or "fill", x - 1, y - 1, width + 2, height + 2, backColor)
         outlineRect.depth = 5000
+
         table.insert(sprites, outlineRect)
     end
 
-    table.insert(sprites, rectangle:getDrawableSprite())
+    local backRect = drawableRectangle.fromRectangle("fill", x + 2, y + 2, width - 4, height - 4, backColor)
 
+    local frameNinePatch = drawableNinePatch.fromTexture(blockTexture, blockNinePatchOptions, x, y, width, height)
+    frameNinePatch:setColor(blockColor)
+
+    local lightsSprite = drawableSprite.fromTexture(lightsTexture, entity)
+    lightsSprite:setPosition(x + math.floor(width / 2), y)
+    lightsSprite:setJustification(0.5, 0.0)
+    lightsSprite:setColor(blockColor)
+
+    table.insert(sprites, backRect)
+
+    local frameSprites = frameNinePatch:getDrawableSprite()
     for _, sprite in ipairs(frameSprites) do
         table.insert(sprites, sprite)
     end
@@ -90,18 +96,24 @@ function dashZipMover.sprite(room, entity)
 
     local x, y = entity.x or 0, entity.y or 0
     local width, height = entity.width or 16, entity.height or 16
-    local halfWidth, halfHeight = math.floor(entity.width / 2), math.floor(entity.height / 2)
-
     local nodes = entity.nodes or {{x = 0, y = 0}}
-    local cogSprite = themeTextures(entity).nodeCog
+
+    local blockTexture = themeTextures(entity).block
+    local lightsTexture = themeTextures(entity).lights
+    local cogTexture = themeTextures(entity).nodeCog
     local ropeColor = entity.ropeColor or defaultRopeColor
 
-    local nodeSprites = communalHelper.getZipMoverNodeSprites(x, y, width, height, nodes, cogSprite, {1, 1, 1}, ropeColor)
+    local nodeSprites = communalHelper.getZipMoverNodeSprites(x, y, width, height, nodes, cogTexture, {1, 1, 1}, ropeColor)
     for _, sprite in ipairs(nodeSprites) do
         table.insert(sprites, sprite)
     end
 
-    addBlockSprites(sprites, entity, themeTextures(entity).block, themeTextures(entity).lights, x, y, width, height)
+    for _, node in ipairs(nodes) do
+        local nodeX, nodeY = node.x or 0, node.y or 0
+        addBlockSprites(sprites, entity, blockTexture, lightsTexture, nodeX, nodeY, width, height, 0.3)
+    end
+
+    addBlockSprites(sprites, entity, blockTexture, lightsTexture, x, y, width, height)
 
     return sprites
 end
